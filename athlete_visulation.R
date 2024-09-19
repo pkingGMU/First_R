@@ -1,19 +1,48 @@
 require(athletemonitoring)
+library(dplyr)
+library(tidyr)
 #> Loading required package: athletemonitoring
-
-data("monitoring")
-
-
-monitoring <- monitoring[monitoring$Variable == "Training Load", ]
+#> 
+#> 
 
 
-monitoring$Date <- as.Date(monitoring$Date, "%Y-%m-%d")
+# Load Data
+data <- read_csv('paper3data_original9.3.csv')
+
+# Ensure what columns are character
+summary(data)
 
 
+# Convert char to double
+data$PERC_EXP_EFF <- as.double(data$PERC_EXP_EFF)
+data$FG_PERC <- as.double(data$FG_PERC)
+data$ORB <- as.double(data$ORB)
+
+
+# Reshape the data for the model
+# Change cols to make variable column
+data_shaped <- data %>%
+
+  
+  pivot_longer (
+    
+    # cols is finding all columns that not the ones specified
+    cols = -any_of(c("FIRST", "LAST", "ATHLETE_ID", "ATHLETE_NUM", "POSITION", "GUARD", "DATE", "TIMEPOINT", "TP1")),  # Select columns to pivot
+    names_to = "Variable",           # New column for variable names
+    values_to = "Value"              # New column for values
+  )
+
+# Choose what variable to monitor
+monitoring <- data_shaped[data_shaped$Variable == "PLAYERLOAD", ]
+
+# Specify date format
+monitoring$DATE <- as.Date(monitoring$DATE, "%m/%d/%y")
+
+# Prepare is the athletemonitoring function
 prepared_data <- prepare(
   data = monitoring,
-  athlete = "Full Name",
-  date = "Date",
+  athlete = "LAST",
+  date = "DATE",
   variable = "Variable",
   value = "Value",
   acute = 7,
@@ -59,87 +88,79 @@ prepared_data <- prepare(
     )
   }
 )
-#> Preparing data...
-#> Rolling...
-#> Group summaries...
-#> Missing data summaries...
-#> Done!
+
 
 # Get summary
 prepared_data
-#> Athlete monitoring numeric data with the following characteristics:
-#> 
-#> 10 athletes:
-#> Alan McDonald, Ann Whitaker, Eve Black, Frank West, John Doe, Michael Peterson, Mike Smith, Peter Jackson, Stuart Rogan, Susan Kane 
-#> 
-#> 363 days:
-#> From 18263 to 18625 
-#> 
-#> 5200 total entries
-#> 
-#> 0 missing entries
-#> 510 missing days
-#> 0 extended days
-#> 
-#> 1 variables:
-#> Training Load 
-#> 
-#> 10 estimators:
-#> variable.value, acute.mean, acute.sd, acute.cv, chronic.mean, chronic.sd, chronic.cv, ACD, ACR, ES
+
 
 summary(prepared_data)
-#> # A tibble: 10 × 16
-#>    athlete          variable     `Total entries` `Day entries` `Missing entries`
-#>    <chr>            <chr>                  <dbl>         <int>             <dbl>
-#>  1 Alan McDonald    Training Lo…             520           363                 0
-#>  2 Ann Whitaker     Training Lo…             520           363                 0
-#>  3 Eve Black        Training Lo…             520           363                 0
-#>  4 Frank West       Training Lo…             520           363                 0
-#>  5 John Doe         Training Lo…             520           363                 0
-#>  6 Michael Peterson Training Lo…             520           363                 0
-#>  7 Mike Smith       Training Lo…             520           363                 0
-#>  8 Peter Jackson    Training Lo…             520           363                 0
-#>  9 Stuart Rogan     Training Lo…             520           363                 0
-#> 10 Susan Kane       Training Lo…             520           363                 0
-#> # ℹ 11 more variables: `Missing days` <int>, `Extended days` <int>,
-#> #   `Start date` <dbl>, `Stop date` <dbl>, Mean <dbl>, SD <dbl>, Min <dbl>,
-#> #   Max <dbl>, Median <dbl>, IQR <dbl>, MAD <dbl>
 
-
-## Plots
-
-# Table plot
-# Produces formattable output with sparklines
-# This will not work in the readme file, so just copy paste to your console
-# plot(
-#  prepared_data,
-#  type = "table",
-#
-#  # Use to filter out estimators
-#  estimator_name = c("acute.mean", "chronic.mean", "ES", "chronic.sd", "chronic.cv"),
-#
-#  # Use to filter out athlete
-#  # athlete_name = NULL,
-#
-#  # Use to filter out variables
-#  #variable_name = NULL,
-#
-#  # Show last entries
-#  last_n = 42,
-#
-#  # Round numbers
-#  digits = 2
-# )
 
 # Bar plot
-# To plot group average
+# Trellis seperates by athlete
 plot(
   prepared_data,
-  type = "bar"
+  type = "bar",
+  trellis=TRUE
+  
 )
-#> Plotting average across athletes. Please select athlete or use `trellis=TRUE`
-#> Warning: Removed 42 rows containing missing values or values outside the scale range
-#> (`geom_line()`).
-#> Removed 42 rows containing missing values or values outside the scale range
-#> (`geom_line()`).
+
+# Line plots
+# These plots represent summary of the rollins estimators
+
+
+plot(
+  prepared_data,
+  type = "line",
+  
+  # To filter out athletes
+  athlete_name = "Mitchell",
+  group_lower_name = "group.lower",
+  group_central_name = "group.median",
+  group_upper_name = "group.upper",
+  trellis = TRUE
+)
+
+
+# Calendar heatmap plot
+plot(
+  prepared_data,
+  type = "calendar",
+  
+  # To filter out athletes
+  athlete_name = "Doster",
+  
+  # To filter out variables
+  #variable_name = "PLAYERLOAD",
+  
+  # To print estimator
+  estimator_name = "variable.value", # Or use "entries"
+  
+  # To filter out last days
+  last_n = 365,
+  
+  # To setup colors
+  low_color = "white",
+  high_color = "red",
+  na_color = "grey50",
+  
+  # Should the whole year be plotted?
+  # Otherwise full months are plotted
+  full_year = FALSE,
+  
+  # Should year label be plotted? 
+  # in the case of multiple years involved
+  # it is always plotted
+  year_label = FALSE,
+  
+  # Short weekdays?
+  short_weekday = TRUE,
+  
+  # Label size
+  label_size = 2,
+  
+  # Aggregation function in the case multiple athletes/variables/levels are used
+  aggregate_func = mean
+)
 
